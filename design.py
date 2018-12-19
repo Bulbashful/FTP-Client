@@ -25,8 +25,10 @@ class LocalTable(QTableWidget):
         global current_path
         current_path = os.getcwd()
         self.setColumnCount(3)
+
         self.setHorizontalHeaderLabels(['File', 'Last modified date'])
         self.setDragEnabled(True)
+        self.verticalHeader().hide()
 
     def mouseReleaseEvent(self, *args, **kwargs):
         #print(self.currentRow())
@@ -44,16 +46,11 @@ class LocalTable(QTableWidget):
 
 
     def mouseDoubleClickEvent(self, *args, **kwargs):
-        #os.chdir(os.path.dirname(os.getcwd()))
-        #print('new ', os.getcwd())
-        # if self.mouseReleaseEvent(*args, **kwargs):
-        #     self.local_files(os.getcwd())
         super(LocalTable, self).mouseDoubleClickEvent(*args, **kwargs)
 
     def local_files(self, path_items):
-        path_items = os.listdir(path_items)
-        print(path_items)
         self.setRowCount(len(path_items)+1)
+        self.setItem(0, 0, QTableWidgetItem('...'))
 
         for num, file in enumerate(path_items, start=1):
             modified_time = os.path.getmtime(file)
@@ -83,7 +80,8 @@ class HostTable(QTableWidget):
     def __init__(self, *__args):
         QTableWidget.__init__(self, *__args)
         self.setColumnCount(3)
-        self.setHorizontalHeaderLabels(['File', 'Last modified date'])
+        self.setHorizontalHeaderLabels(['File', 'Last modified date', 'Rights'])
+        self.verticalHeader().hide()
         self.setDragEnabled(True)
         self.setAcceptDrops(True)
 
@@ -115,14 +113,16 @@ class HostTable(QTableWidget):
         for num, file in enumerate(files_list):
             data = re.findall(r'\d+ \w+ \w+  \w+ \w+.*', file)[0].split(' ')
             data.pop(3)
+            file_rights = re.findall(r'(^[-\w]*)', file)[0]
 
             file_name = QTableWidgetItem(data[4])
             modified_time = QTableWidgetItem(data[2] + ' ' + data[1] + ' ' + data[2])
             icon = 'icons\dir_icon.png' if file[0] == 'd' else r'icons\file_icon.png'
             file_name.setIcon(QIcon(icon))
-            #print(data)
+
             self.setItem(num, 0, QTableWidgetItem(file_name))
             self.setItem(num, 1, QTableWidgetItem(modified_time))
+            self.setItem(num, 2, QTableWidgetItem(file_rights))
         self.setShowGrid(False)
 
 

@@ -25,13 +25,35 @@ class ExampleApp(QtWidgets.QMainWindow, design.Ui_Form):
         # передать файлы текущеё рабочей директории
         self.tableWidget.local_files(os.listdir(os.getcwd()))
         self.hostWidget.server_files()
-        self.tableWidget.cellClicked.connect(self.cellClick)
+        #self.tableWidget.cellClicked.connect(self.cellClick)
+        self.tableWidget.doubleClicked.connect(self.catch_double_click)
         #self.listWidget_2.dragEnabled()
 
-    def cellClick(self, p_int, p_int_1):
-        if p_int == 0:
-            above_path = os.chdir(os.path.dirname(os.getcwd()))
-            self.tableWidget.local_files(os.listdir(above_path))
+    def catch_double_click(self):
+        selected_item = self.tableWidget.item(self.tableWidget.currentRow(), self.tableWidget.currentColumn()).text()
+        try:
+            if self.tableWidget.currentRow() == 0:
+                os.chdir(os.path.dirname(os.getcwd()))
+                self.tableWidget.local_files(os.listdir(os.getcwd()))
+                pass
+            elif os.path.isdir(selected_item):
+                # новая рабочая директория
+                os.chdir(os.getcwd() + f'\{selected_item}')
+                self.tableWidget.local_files(os.listdir(os.getcwd()))
+        except:
+            #TODO add alert
+            print('Error')
+
+    # def cellClick(self, p_int, p_int_1):
+    #     print('+')
+    #     pass
+        # if p_int == 0:
+        #     above_path = os.chdir(os.path.dirname(os.getcwd()))
+        #     self.tableWidget.local_files(os.listdir(above_path))
+        # else:
+        #     print(self.tableWidget.item(p_int, p_int_1))
+        #     pass
+        #     #icon = f'{current_path}\icons\{"dir_icon.png" if os.path.isdir(file) else "file_icon.png"}'
 
 
 
