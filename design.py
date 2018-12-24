@@ -15,21 +15,50 @@ class LocalTable(QTableWidget):
 
     def __init__(self, *__args):
         QTableWidget.__init__(self, *__args)
-        global current_path
-        current_path = os.getcwd()
-        self.setColumnCount(3)
+        global start_path
+        start_path = os.getcwd()
+        self.setColumnCount(2)
         self.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.setHorizontalHeaderLabels(['File', 'Last modified date'])
         self.setDragEnabled(True)
         self.verticalHeader().hide()
-        self.setSelectionBehavior(QTableWidget.SelectRows)
+
+        #self.setSelectionBehavior(QTableWidget.SelectRows)
+        #self.columnAt(2)
+
+    def mousePressEvent(self, e):
+        label = self.childAt(e.pos())
+
+        try:
+            super(LocalTable, self).mousePressEvent(e)
+            a = self.selectedItems()
+            for obj in a:
+                mimeData = QtCore.QMimeData()
+                data = QtCore.QByteArray()
+                app_type = "application/directory" if os.path.isdir(self.currentItem().text()) else "application/file"
+                mimeData.setData(app_type, data)
+                mimeData.setText(obj.text())
+
+                drag = QtGui.QDrag(self)
+                drag.setMimeData(mimeData)
+                print(mimeData.text())
+                pixmap = QtGui.QPixmap(label.size())
+                label.render(pixmap)
+                drag.setPixmap(QtGui.QPixmap(obj.icon().pixmap(label.size())))
+                #drag.setPixmap(pixmap)
+                a = drag.exec_()
+            print(a)
+                #dropAction = drag.exec_(Qt.CopyAction | Qt.MoveAction, Qt.CopyAction)
+                #mimeData.setData("application/x-hotspot",)
+            # self.selectRow(self.rowAt(e.pos().y()))
+
+        except Exception as err:
+            print(err)
 
     def dragMoveEvent(self, e):
-        print('=df')
+        print('+')
+        print(self.currentItem())
         e.accept()
-
-    def mouseDoubleClickEvent(self, *args, **kwargs):
-        super(LocalTable, self).mouseDoubleClickEvent(*args, **kwargs)
 
     def local_files(self, path_items):
         self.setRowCount(len(path_items)+1)
@@ -39,7 +68,7 @@ class LocalTable(QTableWidget):
             modified_time = os.path.getmtime(file)
             custom_modified_time = time.strftime('%b %d %Y', time.localtime(modified_time))
             item = QTableWidgetItem(file)
-            icon = f'{current_path}\icons\{"dir_icon.png" if os.path.isdir(file) else "file_icon.png"}'
+            icon = f'{start_path}\icons\{"dir_icon.png" if os.path.isdir(file) else "file_icon.png"}'
             item.setIcon(QIcon(icon))
             #item.setTextAlignment(Qt.RightToLeft)
 
@@ -68,8 +97,8 @@ class HostTable(QTableWidget):
         self.setShowGrid(False)
         self.setDragEnabled(True)
         self.setAcceptDrops(True)
+        self.setDragDropOverwriteMode(False)
         self.ftp_obi = self.ftp_connector()
-
 
 
     def ftp_connector(self):
@@ -78,15 +107,45 @@ class HostTable(QTableWidget):
         print(ftp.encoding)
         return ftp
 
-    def mouseReleaseEvent(self, *args, **kwargs):
-        print(self.currentRow())
-        self.selectRow(self.currentRow())
-        super(HostTable, self).mouseReleaseEvent(*args, **kwargs)
-
     def dragMoveEvent(self, e):
-        print('=df')
+        #e.setDropAction(QtCore.Qt.CopyAction)
+        print('drag move')
+        #e.accept()
+
+    def dropEvent(self, e):
+        list_of_items = []
+        [list_of_items.append(self.item(table_item, 0).text()) for table_item in range(self.rowCount())]
+        print(self.rowCount())
+        print(list_of_items[1:])
+        icon = f'{start_path}\icons\{"dir_icon.png" if e.mimeData().hasFormat("application/directory") else "file_icon.png"}'
+        if e.mimeData().text() not in list_of_items[1:]:
+            try:
+                self.setRowCount(self.rowCount() + 1)
+                item = QTableWidgetItem(e.mimeData().text())
+                item.setIcon(QIcon(icon))
+                self.setItem(self.rowCount()-1, 0,item)
+                e.accept()
+            except Exception as err:
+                print(err)
+        else:
+            print('exist')
+            e.ignore()
+        #print(self.rowAt(e.pos()))
+        #print(self.rowAt(e.pos().y()))
+
+    def dragEnterEvent(self, e):
+        #e.setDropAction(QtCore.Qt.CopyAction)
+        #e.acceptProposedAction()
         e.accept()
 
+
+    # def dropMimeData(self, row, col, mimeData, action):
+    #     print(self.last_drop_row, row)
+    #     self.last_drop_row = row
+    #     return True
+
+    # def dragLeaveEvent(self, *args, **kwargs):
+    #     print('host leave event')
     def server_files(self, cwd):
         try:
             files_list = []
