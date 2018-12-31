@@ -9,6 +9,7 @@ from ftplib import FTP
 import design
 import sys
 import os
+import ftplib
 import pathlib
 import time
 import re
@@ -25,12 +26,32 @@ class ExampleApp(QtWidgets.QMainWindow, design.Ui_Form):
         # передать файлы текущеё рабочей директории
         self.tableWidget.local_files(os.listdir(os.getcwd()))
         self.host_cwd = ['/']
-        print(self.host_cwd[-1])
-        self.hostWidget.server_files(self.host_cwd[-1])
+        self.hostWidget.host_path_link = self.host_cwd
+        # print(self.host_cwd[-1])
+        # self.hostWidget.server_files(self.host_cwd[-1])
         #self.tableWidget.cellClicked.connect(self.cellClick)
         self.tableWidget.doubleClicked.connect(self.catch_double_click)
         self.hostWidget.doubleClicked.connect(self.catch_host_double_click)
+        self.pybutton.clicked.connect(self.ftp_connector)
         #self.listWidget_2.dragEnabled()
+        self.ftp_obj = None
+
+    def ftp_connector(self):
+        #ftp = ftplib.FTP('92.242.39.60','')
+        try:
+            print(self.line_ip.text(), self.line_username.text(), self.line_password.text())
+            ftp = ftplib.FTP(self.line_ip.text(), self.line_username.text(), self.line_password.text())
+            ftp = ftplib.FTP('ftp.dlptest.com', 'dlpuser@dlptest.com', 'e73jzTRTNqCN9PYAAjjn')
+            try:
+                ftp.login()
+            except Exception as err:
+                print(err)
+            self.ftp_obj = ftp
+            self.hostWidget.ftp_upload_obj = ftp
+            return self.hostWidget.server_files('/', self.ftp_obj)
+        except Exception as err:
+            #TODO Alert
+            print(err)
 
     def catch_double_click(self):
         selected_item = self.tableWidget.item(self.tableWidget.currentRow(), self.tableWidget.currentColumn()).text()
@@ -56,10 +77,13 @@ class ExampleApp(QtWidgets.QMainWindow, design.Ui_Form):
             pass
         if item_permission is None:
             self.host_cwd.pop()
-            self.hostWidget.server_files(self.host_cwd[-1])
+            self.hostWidget.server_files(self.host_cwd[-1], self.ftp_obj)
         elif item_permission[0] == 'd':
-            self.host_cwd.append(f'/{selected_item}')
-            self.hostWidget.server_files(selected_item)
+            try:
+                self.host_cwd.append(f'/{selected_item}')
+                self.hostWidget.server_files(selected_item, self.ftp_obj)
+            except Exception as err:
+                print(err)
 def main():
     app = QtWidgets.QApplication(sys.argv)  # Новый экземпляр QApplication
     window = ExampleApp()  # Создаём объект класса ExampleApp

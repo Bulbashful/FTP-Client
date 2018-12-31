@@ -7,8 +7,8 @@ from PyQt5.QtWidgets import QWidget, QPushButton, QApplication, QListWidgetItem,
 import time
 import ftplib
 import re
-from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem
+from PyQt5.QtGui import QIcon, QCursor
+from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem, QLineEdit, QPushButton, QMenu
 
 
 class LocalTable(QTableWidget):
@@ -41,13 +41,11 @@ class LocalTable(QTableWidget):
 
                 drag = QtGui.QDrag(self)
                 drag.setMimeData(mimeData)
-                print(mimeData.text())
                 pixmap = QtGui.QPixmap(label.size())
                 label.render(pixmap)
                 drag.setPixmap(QtGui.QPixmap(obj.icon().pixmap(label.size())))
                 #drag.setPixmap(pixmap)
                 a = drag.exec_()
-            print(a)
                 #dropAction = drag.exec_(Qt.CopyAction | Qt.MoveAction, Qt.CopyAction)
                 #mimeData.setData("application/x-hotspot",)
             # self.selectRow(self.rowAt(e.pos().y()))
@@ -56,7 +54,6 @@ class LocalTable(QTableWidget):
             print(err)
 
     def dragMoveEvent(self, e):
-        print('+')
         print(self.currentItem())
         e.accept()
 
@@ -98,14 +95,44 @@ class HostTable(QTableWidget):
         self.setDragEnabled(True)
         self.setAcceptDrops(True)
         self.setDragDropOverwriteMode(False)
-        self.ftp_obi = self.ftp_connector()
+        self.ftp_upload_obj = None
+        self.host_path_link = None
 
+    def contextMenuEvent(self, pos):
+        try:
+            menu = QMenu()
+            pass_co = menu.addAction('pass')
+            deletion = menu.addAction('Delete')
+            action = menu.exec_(QCursor.pos())
+            if action == deletion:
+                self.remove_host_file(self.currentItem().text())
+        except Exception as err:
+            print(err)
 
-    def ftp_connector(self):
-        ftp = ftplib.FTP('92.242.39.60')
-        ftp.login()
-        print(ftp.encoding)
-        return ftp
+    def remove_host_file(self, file):
+        item_permission = self.item(self.currentRow(), 2).text()
+        if item_permission[0] != 'd':
+            try:
+                self.ftp_upload_obj.delete(file)
+            except Exception as err:
+                print(err)
+        else:
+            try:
+                self.ftp_upload_obj.rmd(file)
+            except Exception as err:
+                items = self.ftp_upload_obj.nlst(file)
+                self.ftp_upload_obj.cwd(file)
+                print(items)
+                if items[0] != '.' and items[1] != '..':
+                    [self.ftp_upload_obj.delete(file_dir) for file_dir in items]
+                else:
+                    [self.ftp_upload_obj.delete(file_dir) for file_dir in items[2:]]
+                print(self.host_path_link)
+                #self.host_path_link.pop()
+                self.ftp_upload_obj.cwd(self.host_path_link[-1])
+                self.ftp_upload_obj.rmd(file)
+                self.server_files(self.host_path_link[-1], self.ftp_upload_obj)
+
 
     def dragMoveEvent(self, e):
         #e.setDropAction(QtCore.Qt.CopyAction)
@@ -115,8 +142,8 @@ class HostTable(QTableWidget):
     def dropEvent(self, e):
         list_of_items = []
         [list_of_items.append(self.item(table_item, 0).text()) for table_item in range(self.rowCount())]
-        print(self.rowCount())
         print(list_of_items[1:])
+        print(e.mimeData())
         icon = f'{start_path}\icons\{"dir_icon.png" if e.mimeData().hasFormat("application/directory") else "file_icon.png"}'
         if e.mimeData().text() not in list_of_items[1:]:
             try:
@@ -124,7 +151,14 @@ class HostTable(QTableWidget):
                 item = QTableWidgetItem(e.mimeData().text())
                 item.setIcon(QIcon(icon))
                 self.setItem(self.rowCount()-1, 0,item)
+                if e.mimeData().hasFormat("application/directory"):
+                    self.ftp_upload_obj.mkd(e.mimeData().text())
+                    self.ftp_upload_obj.cwd(e.mimeData().text())
+                    #print(e.mimeData().text())
+                    print(os.path.abspath(e.mimeData().text()))
+                self.uploadThis(os.path.abspath(e.mimeData().text()), self.ftp_upload_obj)
                 e.accept()
+                self.server_files(self.host_path_link[-1], self.ftp_upload_obj)
             except Exception as err:
                 print(err)
         else:
@@ -146,41 +180,79 @@ class HostTable(QTableWidget):
 
     # def dragLeaveEvent(self, *args, **kwargs):
     #     print('host leave event')
-    def server_files(self, cwd):
+    def server_files(self, cwd, ftp_obj):
         try:
             files_list = []
-            self.ftp_obi.cwd(cwd)
+            ftp_obj.cwd(cwd)
             # callback функция для занесения файлв в список вместо стандартного stdout callback
             custom_callback = lambda n: files_list.append(n)
             # получить список файлов с сервера
-            self.ftp_obi.retrlines('LIST', custom_callback)
+            ftp_obj.retrlines('LIST', custom_callback)
 
             self.setRowCount(len(files_list) + 1)
             self.setItem(0, 0, QTableWidgetItem('...'))
             for num, file in enumerate(files_list, start=1):
-
-                    data = re.findall(r'\d+ \w+ \w+  \w+ \w+.*', file)[0].split(' ')
-                    data.pop(3)
+                    permissions = re.search(r'^[-]?[\w+-]*', file).group()
+                    name = re.search(r'[\w_-]*[].?[\w+]*$', file).group()
+                    date = re.search(r'\w+ \d+ \s{0,1}\d+[:]?\d+',file).group()
                     file_rights = re.findall(r'(^[-\w]*)', file)[0]
 
-                    file_name = QTableWidgetItem(data[4])
-                    modified_time = QTableWidgetItem(data[2] + ' ' + data[1] + ' ' + data[2])
-                    icon = 'icons\dir_icon.png' if file[0] == 'd' else r'icons\file_icon.png'
+                    file_name = QTableWidgetItem(name)
+                    modified_time = QTableWidgetItem(date)
+                    print(start_path)
+                    print('+')
+                    icon = f'{start_path}\icons\dir_icon.png' if permissions[0] == 'd' else r'%s\icons\file_icon.png' % start_path
                     file_name.setIcon(QIcon(icon))
 
                     self.setItem(num, 0, QTableWidgetItem(file_name))
                     self.setItem(num, 1, QTableWidgetItem(modified_time))
                     self.setItem(num, 2, QTableWidgetItem(file_rights))
         except ftplib.error_perm:
-            self.server_files('/')
+            self.server_files('/', ftp_obj)
         except Exception as err:
             print(err)
+
+    def uploadThis(self,path, ftp_obj):
+        print(path)
+        print(os.listdir(path))
+        files = os.listdir(path)
+        os.chdir(path)
+        for f in files:
+            if os.path.isfile(path + r'\{}'.format(f)):
+                fh = open(f, 'rb')
+                ftp_obj.storbinary('STOR %s' % f, fh)
+                fh.close()
+            elif os.path.isdir(path + r'\{}'.format(f)):
+                ftp_obj.mkd(f)
+                ftp_obj.cwd(f)
+                self.uploadThis(path + r'\{}'.format(f), ftp_obj)
+        ftp_obj.cwd('/')
+        #os.chdir('..')
 
 
 class Ui_Form(object):
     def setupUi(self, Form):
         Form.setObjectName("Form")
-        Form.resize(930, 601)
+        Form.resize(990, 630)
+        self.line_ip = QLineEdit(self)
+        self.line_ip.setPlaceholderText('address')
+        self.line_ip.move(20, 20)
+        self.line_ip.resize(200, 25)
+
+        self.line_username = QLineEdit(self)
+        self.line_username.setPlaceholderText('username')
+        self.line_username.move(250, 20)
+        self.line_username.resize(200, 25)
+
+        self.line_password = QLineEdit(self)
+        self.line_password.setPlaceholderText('password')
+        self.line_password.move(480, 20)
+        self.line_password.resize(200, 25)
+
+        self.pybutton = QPushButton('Connect', self)
+        self.pybutton.resize(200, 32)
+        self.pybutton.move(700, 20)
+
         self.progressBar = QtWidgets.QProgressBar(Form)
         self.progressBar.setGeometry(QtCore.QRect(120, 320, 118, 23))
         self.progressBar.setProperty("value", 24)
@@ -189,10 +261,10 @@ class Ui_Form(object):
         self.listWidget.setGeometry(QtCore.QRect(20, 340, 891, 231))
         self.listWidget.setObjectName("listWidget")
         self.hostWidget = HostTable(Form)
-        self.hostWidget.setGeometry(QtCore.QRect(480, 40, 431, 241))
+        self.hostWidget.setGeometry(QtCore.QRect(480, 60, 431, 241))
         self.hostWidget.setObjectName("hostWidget")
         self.tableWidget = LocalTable(Form)
-        self.tableWidget.setGeometry(QtCore.QRect(20, 40, 431, 241))
+        self.tableWidget.setGeometry(QtCore.QRect(20, 60, 431, 241))
         self.tableWidget.setObjectName("tableWidget")
 
         self.retranslateUi(Form)
