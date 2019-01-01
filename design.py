@@ -20,15 +20,10 @@ class LocalTable(QTableWidget):
         self.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.setHorizontalHeaderLabels(['File', 'Last modified date'])
         self.setDragEnabled(True)
-        self.setAcceptDrops(True)
-        self.setDragDropOverwriteMode(False)
         self.verticalHeader().hide()
 
     def mousePressEvent(self, e):
         label = self.childAt(e.pos())
-
-    def dragEnterEvent(self, e):
-        e.accept()
 
         try:
             super(LocalTable, self).mousePressEvent(e)
@@ -55,6 +50,7 @@ class LocalTable(QTableWidget):
             print(err)
 
     def dragMoveEvent(self, e):
+        print(self.currentItem())
         e.accept()
 
     def local_files(self, path_items):
@@ -97,31 +93,6 @@ class HostTable(QTableWidget):
         self.setDragDropOverwriteMode(False)
         self.ftp_upload_obj = None
         self.host_path_link = None
-
-
-    def mousePressEvent(self, e):
-        label = self.childAt(e.pos())
-
-        try:
-            super(HostTable, self).mousePressEvent(e)
-            a = self.selectedItems()
-            print(a)
-            for obj in a:
-                mimeData = QtCore.QMimeData()
-                data = QtCore.QByteArray()
-                app_type = "application/directory" if os.path.isdir(obj.text()) else "application/file"
-                mimeData.setData(app_type, data)
-                mimeData.setText(obj.text())
-
-                drag = QtGui.QDrag(self)
-                drag.setMimeData(mimeData)
-                pixmap = QtGui.QPixmap(label.size())
-                label.render(pixmap)
-                drag.setPixmap(QtGui.QPixmap(obj.icon().pixmap(label.size())))
-                #drag.setPixmap(pixmap)
-                drag.exec_()
-        except Exception as err:
-            print(err)
 
     def dir_download(self, path, cwd, ftp_obj):
         files = path.nlst()
@@ -240,6 +211,11 @@ class HostTable(QTableWidget):
             self.server_files(self.host_path_link[-1], self.ftp_upload_obj)
         except Exception as err:
             print(err)
+    # else:
+    #     print('exist')
+    #     e.ignore()
+        #print(self.rowAt(e.pos()))
+        #print(self.rowAt(e.pos().y()))
 
     def dragEnterEvent(self, e):
         e.accept()
@@ -293,6 +269,28 @@ class HostTable(QTableWidget):
             except:
                 pass
             walk[1].pop(0)
+
+   # def upload_files(self, path, ftp_obj):
+        #self.test(path, ftp_obj)
+        # files = os.listdir(path)
+        # os.chdir(path)
+        # files_list = []
+        # dirs_list = []
+        # [files_list.append(file) for file in files if os.path.isfile(path + r'\{}'.format(file))]
+        # print('files', files)
+        # for f in files:
+        #     print(os.getcwd())
+        #     print(os.path.isfile(path + r'\{}'.format(f)))
+        #     if os.path.isfile(path + r'\{}'.format(f)):
+        #         fh = open(f, 'rb')
+        #         ftp_obj.storbinary('STOR %s' % f, fh)
+        #         fh.close()
+        #     elif os.path.isdir(path + r'\{}'.format(f)):
+        #         ftp_obj.mkd(f)
+        #         ftp_obj.cwd(f)
+        #         self.upload_files(path + r'\{}'.format(f), ftp_obj)
+        # ftp_obj.cwd('/')
+        # os.chdir('..')
 
 
 class Ui_Form(object):
