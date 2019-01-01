@@ -10,6 +10,7 @@ import design
 import sys
 import os
 import ftplib
+from pathlib import Path
 import pathlib
 import time
 import re
@@ -27,8 +28,8 @@ class ExampleApp(QtWidgets.QMainWindow, design.Ui_Form):
         self.tableWidget.local_files(os.listdir(os.getcwd()))
         self.host_cwd = ['/']
         self.hostWidget.host_path_link = self.host_cwd
-        # print(self.host_cwd[-1])
-        # self.hostWidget.server_files(self.host_cwd[-1])
+        # print(self.host_cwd[-3])
+        # self.hostWidget.server_files(self.host_cwd[-3])
         #self.tableWidget.cellClicked.connect(self.cellClick)
         self.tableWidget.doubleClicked.connect(self.catch_double_click)
         self.hostWidget.doubleClicked.connect(self.catch_host_double_click)

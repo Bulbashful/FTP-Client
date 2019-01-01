@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import QWidget, QPushButton, QApplication, QListWidgetItem,
     QGridLayout, QTableWidget, QTableWidgetItem, QFrame, QAbstractItemView
 import time
 import ftplib
+from pathlib import Path
 import re
 from PyQt5.QtGui import QIcon, QCursor
 from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem, QLineEdit, QPushButton, QMenu
@@ -156,7 +157,7 @@ class HostTable(QTableWidget):
                     self.ftp_upload_obj.cwd(e.mimeData().text())
                     #print(e.mimeData().text())
                     print(os.path.abspath(e.mimeData().text()))
-                self.uploadThis(os.path.abspath(e.mimeData().text()), self.ftp_upload_obj)
+                self.upload_files(os.path.abspath(e.mimeData().text()), self.ftp_upload_obj)
                 e.accept()
                 self.server_files(self.host_path_link[-1], self.ftp_upload_obj)
             except Exception as err:
@@ -192,42 +193,65 @@ class HostTable(QTableWidget):
             self.setRowCount(len(files_list) + 1)
             self.setItem(0, 0, QTableWidgetItem('...'))
             for num, file in enumerate(files_list, start=1):
-                    permissions = re.search(r'^[-]?[\w+-]*', file).group()
-                    name = re.search(r'[\w_-]*[].?[\w+]*$', file).group()
-                    date = re.search(r'\w+ \d+ \s{0,1}\d+[:]?\d+',file).group()
-                    file_rights = re.findall(r'(^[-\w]*)', file)[0]
+                permissions = re.search(r'^[-]?[\w+-]*', file).group()
+                name = re.search(r'[\w_-]*[].?[\w+]*$', file).group()
+                date = re.search(r'\w+\s{0,2}\d+ \s{0,3}\d+[:]?\d+',file).group()
+                file_rights = re.findall(r'(^[-\w]*)', file)[0]
 
-                    file_name = QTableWidgetItem(name)
-                    modified_time = QTableWidgetItem(date)
-                    print(start_path)
-                    print('+')
-                    icon = f'{start_path}\icons\dir_icon.png' if permissions[0] == 'd' else r'%s\icons\file_icon.png' % start_path
-                    file_name.setIcon(QIcon(icon))
+                file_name = QTableWidgetItem(name)
+                modified_time = QTableWidgetItem(date)
+                icon = f'{start_path}\icons\dir_icon.png' if permissions[0] == 'd' else r'%s\icons\file_icon.png' % start_path
+                file_name.setIcon(QIcon(icon))
 
-                    self.setItem(num, 0, QTableWidgetItem(file_name))
-                    self.setItem(num, 1, QTableWidgetItem(modified_time))
-                    self.setItem(num, 2, QTableWidgetItem(file_rights))
+                self.setItem(num, 0, QTableWidgetItem(file_name))
+                self.setItem(num, 1, QTableWidgetItem(modified_time))
+                self.setItem(num, 2, QTableWidgetItem(file_rights))
         except ftplib.error_perm:
             self.server_files('/', ftp_obj)
         except Exception as err:
             print(err)
 
-    def uploadThis(self,path, ftp_obj):
-        print(path)
-        print(os.listdir(path))
-        files = os.listdir(path)
-        os.chdir(path)
-        for f in files:
-            if os.path.isfile(path + r'\{}'.format(f)):
-                fh = open(f, 'rb')
-                ftp_obj.storbinary('STOR %s' % f, fh)
-                fh.close()
-            elif os.path.isdir(path + r'\{}'.format(f)):
-                ftp_obj.mkd(f)
-                ftp_obj.cwd(f)
-                self.uploadThis(path + r'\{}'.format(f), ftp_obj)
-        ftp_obj.cwd('/')
-        #os.chdir('..')
+    def test(self, path, ftp_obj):
+        walk = list(os.walk(path))[0]
+        for file in walk[2]:
+            fh = open(walk[0] + r'\\' + file, 'rb')
+            ftp_obj.storbinary('STOR %s' % file, fh)
+            fh.close()
+        while len(walk[1]) != 0:
+            print(walk[1][0])
+            ftp_obj.mkd(walk[1][0])
+            ftp_obj.cwd(walk[1][0])
+            self.test(path + r'\%s' % walk[1][0], ftp_obj)
+            try:
+                ftp_obj.cwd('/' + os.path.basename(Path(walk[0]).parents[0]))
+            except:
+                pass
+            walk[1].pop(0)
+            # fh = open(f, 'rb')
+            # ftp_obj.storbinary('STOR %s' % f, fh)
+            # fh.close()
+
+    def upload_files(self, path, ftp_obj):
+        self.test(path, ftp_obj)
+        # files = os.listdir(path)
+        # os.chdir(path)
+        # files_list = []
+        # dirs_list = []
+        # [files_list.append(file) for file in files if os.path.isfile(path + r'\{}'.format(file))]
+        # print('files', files)
+        # for f in files:
+        #     print(os.getcwd())
+        #     print(os.path.isfile(path + r'\{}'.format(f)))
+        #     if os.path.isfile(path + r'\{}'.format(f)):
+        #         fh = open(f, 'rb')
+        #         ftp_obj.storbinary('STOR %s' % f, fh)
+        #         fh.close()
+        #     elif os.path.isdir(path + r'\{}'.format(f)):
+        #         ftp_obj.mkd(f)
+        #         ftp_obj.cwd(f)
+        #         self.upload_files(path + r'\{}'.format(f), ftp_obj)
+        # ftp_obj.cwd('/')
+        # os.chdir('..')
 
 
 class Ui_Form(object):
