@@ -20,7 +20,58 @@ class LocalTable(QTableWidget):
         self.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.setHorizontalHeaderLabels(['File', 'Last modified date'])
         self.setDragEnabled(True)
+        self.setAcceptDrops(True)
+        self.setDragDropOverwriteMode(False)
         self.verticalHeader().hide()
+        self.ftp_obj = None
+
+    def dragEnterEvent(self, e):
+        e.accept()
+
+    def dropEvent(self, e):
+        #list_of_items = []
+        #[list_of_items.append(self.item(table_item, 0).text()) for table_item in range(self.rowCount())]
+        #print(list_of_items[1:])
+        #print(e.mimeData())
+        icon = f'{start_path}\icons\{"dir_icon.png" if e.mimeData().hasFormat("application/directory") else "file_icon.png"}'
+        print(e.mimeData().text())
+        # # if e.mimeData().text() not in list_of_items[1:]:
+        try:
+            self.setRowCount(self.rowCount() + 1)
+            item = QTableWidgetItem(e.mimeData().text())
+            item.setIcon(QIcon(icon))
+            self.setItem(self.rowCount()-1, 0,item)
+            # d = os.getcwd()
+            if e.mimeData().hasFormat("application/directory"):
+                self.dirs_upload(os.getcwd(), e.mimeData().text(), self.ftp_obj, self.ftp_obj.pwd())
+            else:
+                fh = open(os.getcwd() + r'\%s' % e.mimeData().text(), 'wb')
+                self.ftp_obj.retrbinary('RETR %s' % e.mimeData().text(), lambda data: fh.write(data))
+                fh.close()
+            self.local_files(os.listdir(os.getcwd()))
+            #e.accept()
+        except Exception as err:
+            print(err)
+
+    def dirs_upload(self, path, dir_to_upload, ftp_obj, back_path):
+        os.mkdir(path + r'\%s' % dir_to_upload)
+        ftp_obj.cwd(dir_to_upload)
+        files = ftp_obj.nlst()
+        dirs_to_upload = []
+        for file in files:
+            if file != '.' and file != '..' and file != '...':
+                try:
+                    with open(path + r'\%s' % dir_to_upload + r'\%s' % file, 'wb') as fh:
+                        self.ftp_obj.retrbinary('RETR %s' % file, lambda data: fh.write(data))
+                    # fh.close()
+                except Exception as err:
+                    os.remove(path + r'\%s' % dir_to_upload + r'\%s' % file)
+                    print(err)
+                    dirs_to_upload.append(file)
+        while len(dirs_to_upload) != 0:
+            self.dirs_upload(path + r'\%s' % dir_to_upload, dirs_to_upload[0], self.ftp_obj, self.ftp_obj.pwd())
+            dirs_to_upload.pop(0)
+        self.ftp_obj.cwd(back_path)
 
     def mousePressEvent(self, e):
         label = self.childAt(e.pos())
@@ -50,7 +101,6 @@ class LocalTable(QTableWidget):
             print(err)
 
     def dragMoveEvent(self, e):
-        print(self.currentItem())
         e.accept()
 
     def local_files(self, path_items):
@@ -94,42 +144,36 @@ class HostTable(QTableWidget):
         self.ftp_upload_obj = None
         self.host_path_link = None
 
-    def dir_download(self, path, cwd, ftp_obj):
-        files = path.nlst()
-        for file in files:
-            try:
-                file_obj = open(os.getcwd() + file, 'wb')
-                ftp_obj.retrbinary('RETR %s' % file, ftp_obj)
-                file_obj.close()
-            except Exception as err:
-                print(err)
-                os.mkdir(os.getcwd() + file)
-                ftp_obj.cwd(file)
-                self.dir_download(path, cwd, ftp_obj)
-                ftp_obj.cwd(path)
-
-
-
-        # try:
-        #     files = ftp_obj.nlst(path)
-        #     dirs_list = []
-        #     for file in files:
-        #         try:
-        #             ftp_obj.delete(file)
-        #             print(file)
-        #         except Exception as err:
-        #             dirs_list.append(file) if file != '.' and file != '..' and file != '...' else None
-        #     while len(dirs_list) != 0:
-        #         try:
-        #             ftp_obj.rmd(dirs_list[0])
-        #         except:
-        #             ftp_obj.cwd(dirs_list[0])
-        #             self.dirs_deletion(ftp_obj.pwd(), cwd, ftp_obj)
-        #             ftp_obj.cwd(path)
-        #         ftp_obj.rmd(dirs_list[0])
-        #         dirs_list.pop(0)
-        # except Exception as err:
-        #     pass
+    # def dir_download(self, path, cwd, ftp_obj):
+    #     files = path.nlst()
+    #     for file in files:
+    #         try:
+    #             file_obj = open(os.getcwd() + file, 'wb')
+    #             ftp_obj.retrbinary('RETR %s' % file, ftp_obj)
+    #         except Exception as err:
+    #             print(err)
+    #             os.mkdir(os.getcwd() + file)
+    #
+    #     try:
+    #         files = ftp_obj.nlst(path)
+    #         dirs_list = []
+    #         for file in files:
+    #             try:
+    #                 ftp_obj.delete(file)
+    #                 print(file)
+    #             except Exception as err:
+    #                 dirs_list.append(file) if file != '.' and file != '..' and file != '...' else None
+    #         while len(dirs_list) != 0:
+    #             try:
+    #                 ftp_obj.rmd(dirs_list[0])
+    #             except:
+    #                 ftp_obj.cwd(dirs_list[0])
+    #                 self.dirs_deletion(ftp_obj.pwd(), cwd, ftp_obj)
+    #                 ftp_obj.cwd(path)
+    #             ftp_obj.rmd(dirs_list[0])
+    #             dirs_list.pop(0)
+    #     except Exception as err:
+    #         pass
 
     def contextMenuEvent(self, pos):
         try:
@@ -186,12 +230,7 @@ class HostTable(QTableWidget):
         e.accept()
 
     def dropEvent(self, e):
-        #list_of_items = []
-        #[list_of_items.append(self.item(table_item, 0).text()) for table_item in range(self.rowCount())]
-        #print(list_of_items[1:])
-        #print(e.mimeData())
         icon = f'{start_path}\icons\{"dir_icon.png" if e.mimeData().hasFormat("application/directory") else "file_icon.png"}'
-        # if e.mimeData().text() not in list_of_items[1:]:
         try:
             self.setRowCount(self.rowCount() + 1)
             item = QTableWidgetItem(e.mimeData().text())
@@ -211,17 +250,75 @@ class HostTable(QTableWidget):
             self.server_files(self.host_path_link[-1], self.ftp_upload_obj)
         except Exception as err:
             print(err)
-    # else:
-    #     print('exist')
-    #     e.ignore()
-        #print(self.rowAt(e.pos()))
-        #print(self.rowAt(e.pos().y()))
+
+    def mouseMoveEvent(self, e):
+        super(HostTable, self).mouseMoveEvent(e)
+        label = self.childAt(e.pos())
+        to_download_dict = dict()
+        for n, item in enumerate(self.selectedItems()):
+            if n % 3 == 0 and self.item(item.row(), 2).text()[0] == 'd':
+                to_download_dict.update({self.item(item.row(), 0).text(): [self.item(item.row(), 2).text()[0], item.icon()]})
+            elif n % 3 == 0 and self.item(item.row(), 2).text()[0] == '-' or self.item(item.row(), 2).text()[0] == 'r':
+                to_download_dict.update({self.item(item.row(), 0).text(): [self.item(item.row(), 2).text()[0], item.icon()]})
+
+        print(to_download_dict)
+        try:
+            super(HostTable, self).mousePressEvent(e)
+            for obj in to_download_dict:
+                print('+')
+                mimeData = QtCore.QMimeData()
+                data = QtCore.QByteArray()
+                app_type = "application/directory" if to_download_dict[obj][0] == 'd' else "application/file"
+                mimeData.setData(app_type, data)
+                mimeData.setText(obj)
+
+                drag = QtGui.QDrag(self)
+                drag.setMimeData(mimeData)
+                pixmap = QtGui.QPixmap(label.size())
+                label.render(pixmap)
+                drag.setPixmap(QtGui.QPixmap(to_download_dict[obj][1].pixmap(label.size())))
+                #drag.setPixmap(pixmap)
+                if drag.exec_(QtCore.Qt.CopyAction | QtCore.Qt.MoveAction) == QtCore.Qt.MoveAction:
+                    print('moved')
+        except Exception as err:
+            print(err)
+    #for dragging
+    # def mousePressEvent(self, e):
+    #     label = self.childAt(e.pos())
+    #
+    #     #[print(k.text()) for k in self.selectedItems()]
+    #     to_download_dict = dict()
+    #     for n, item in enumerate(self.selectedItems()):
+    #         if n % 3 == 0 and self.item(item.row(), 2).text()[0] == 'd':
+    #             to_download_dict.update({self.item(item.row(), 0).text(): [self.item(item.row(), 2).text()[0], item.icon()]})
+    #         elif n % 3 == 0 and self.item(item.row(), 2).text()[0] == '-' or self.item(item.row(), 2).text()[0] == 'r':
+    #             to_download_dict.update({self.item(item.row(), 0).text(): [self.item(item.row(), 2).text()[0], item.icon()]})
+    #
+    #     print(to_download_dict)
+    #     try:
+    #         super(HostTable, self).mousePressEvent(e)
+    #         selected_items = self.selectedItems()
+    #         for obj in to_download_dict:
+    #             print('+')
+    #             mimeData = QtCore.QMimeData()
+    #             data = QtCore.QByteArray()
+    #             app_type = "application/directory" if to_download_dict[obj][0] == 'd' else "application/file"
+    #             mimeData.setData(app_type, data)
+    #             mimeData.setText(obj)
+    #
+    #             drag = QtGui.QDrag(self)
+    #             drag.setMimeData(mimeData)
+    #             pixmap = QtGui.QPixmap(label.size())
+    #             label.render(pixmap)
+    #             drag.setPixmap(QtGui.QPixmap(to_download_dict[obj][1].pixmap(label.size())))
+    #             #drag.setPixmap(pixmap)
+    #             if drag.exec_(QtCore.Qt.CopyAction | QtCore.Qt.MoveAction) == QtCore.Qt.MoveAction:
+    #                 print('moved')
+    #     except Exception as err:
+    #         print(err)
 
     def dragEnterEvent(self, e):
         e.accept()
-
-    # def dragLeaveEvent(self, *args, **kwargs):
-    #     print('host leave event')
 
     def server_files(self, cwd, ftp_obj):
         try:
@@ -269,28 +366,6 @@ class HostTable(QTableWidget):
             except:
                 pass
             walk[1].pop(0)
-
-   # def upload_files(self, path, ftp_obj):
-        #self.test(path, ftp_obj)
-        # files = os.listdir(path)
-        # os.chdir(path)
-        # files_list = []
-        # dirs_list = []
-        # [files_list.append(file) for file in files if os.path.isfile(path + r'\{}'.format(file))]
-        # print('files', files)
-        # for f in files:
-        #     print(os.getcwd())
-        #     print(os.path.isfile(path + r'\{}'.format(f)))
-        #     if os.path.isfile(path + r'\{}'.format(f)):
-        #         fh = open(f, 'rb')
-        #         ftp_obj.storbinary('STOR %s' % f, fh)
-        #         fh.close()
-        #     elif os.path.isdir(path + r'\{}'.format(f)):
-        #         ftp_obj.mkd(f)
-        #         ftp_obj.cwd(f)
-        #         self.upload_files(path + r'\{}'.format(f), ftp_obj)
-        # ftp_obj.cwd('/')
-        # os.chdir('..')
 
 
 class Ui_Form(object):

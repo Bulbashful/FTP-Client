@@ -49,6 +49,7 @@ class ExampleApp(QtWidgets.QMainWindow, design.Ui_Form):
                 print(err)
             self.ftp_obj = ftp
             self.hostWidget.ftp_upload_obj = ftp
+            self.tableWidget.ftp_obj = ftp
             return self.hostWidget.server_files('/', self.ftp_obj)
         except Exception as err:
             #TODO Alert
