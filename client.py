@@ -65,8 +65,7 @@ class ExampleApp(QtWidgets.QMainWindow, design.Ui_Form):
                 os.chdir(os.getcwd() + f'\{selected_item}')
                 self.tableWidget.local_files(os.listdir(os.getcwd()))
         except:
-            #TODO add alert
-            print('Error')
+            pass
 
     def catch_host_double_click(self):
         selected_item = self.hostWidget.item(self.hostWidget.currentRow(), self.hostWidget.currentColumn()).text()

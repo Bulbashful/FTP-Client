@@ -134,7 +134,7 @@ class LocalTable(QTableWidget):
                 drag.exec_()
 
         except Exception as err:
-            print(err)
+            pass
 
     def dragMoveEvent(self, e):
         e.accept()
@@ -209,7 +209,7 @@ class HostTable(QTableWidget):
                         self.table_bar_obj.scrollToBottom()
                 self.server_files(current_host_cwd, self.ftp_upload_obj)
         except Exception as err:
-            print(err)
+            pass
 
     def dirs_deletion(self, path, cwd, ftp_obj):
         try:
